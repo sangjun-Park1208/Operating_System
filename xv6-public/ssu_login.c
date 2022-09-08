@@ -12,7 +12,7 @@ char pwBuf[16];
 char *argv_[] = { "sh", 0 };
 
 void get_user_list(){
-    int fd, i, k, j, n;
+    int fd, i, k, j;
     if((fd = open("list.txt", O_RDONLY)) < 0){
         printf(1, "open error in %s\n", "list.txt");
         exit();
@@ -21,14 +21,12 @@ void get_user_list(){
     i=0; k=0; j=0;
     int isID, isPW;
     isID = 1; isPW = 0;
-    while((n = read(fd, buf, sizeof(buf))) > 0){
-        printf(1, "buf[0] : %s\n", buf);
+    while(read(fd, buf, sizeof(buf)) > 0){
         if(buf[0] == ' '){
             isID = 0; isPW = 1; 
             continue;
         }
         if(buf[0] == '\n'){
-            // while(buf[0] == '\n') read(fd, buf, sizeof(buf));
             i++; j=k=0;
             isID = 1; isPW = 0;
             continue;
@@ -43,31 +41,6 @@ void get_user_list(){
             continue;
         }
 
-    }
-
-
-
-    // while((n = read(fd, buf, sizeof(buf))) > 0){
-
-    //     printf(1, "buf : %s\n", buf);
-    //     while(buf[j] != ' '){
-    //         userID[i][s++] = buf[j++];
-    //     }
-    //     userID[i][s] = '\0';
-    //     printf(1, "userID : %s\n", userID[i]);
-    //     j++;
-
-    //     while(buf[j] != '\n'){
-    //         pwdID[i][k++] = buf[j++];
-    //     }
-    //     pwdID[i][k] = '\0';
-    //     printf(1, "pwdID : %s\n", pwdID[i]);
-    //     while(buf[j] == '\n') j++;
-    //     j=s=k=0;
-    //     i++;
-    // }
-    for(int i=0; i<2; i++){
-        printf(1, "ID : %s, PW : %s.\n", userID[i], pwdID[i]);
     }
 
     close(fd);
@@ -93,7 +66,6 @@ int check_idpw(){
 }
 
 int main(int argc, char* argv[]){
-    printf(1, "DEBUG\n");
     int chk, pid, wpid;
 
     get_user_list();
