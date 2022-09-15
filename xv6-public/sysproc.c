@@ -96,3 +96,9 @@ int sys_memsize(void){
   size = p->sz;
   return size;
 }
+
+int sys_trace(void){
+  if(argint(0, &myproc()->tracemask) < 0)
+    return -1;
+  return 0;
+}
