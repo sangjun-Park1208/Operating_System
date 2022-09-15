@@ -63,6 +63,7 @@ morecore(uint nu)
 void*
 malloc(uint nbytes)
 {
+  printf(1, "malloc start!\n");
   Header *p, *prevp;
   uint nunits;
 
@@ -72,6 +73,8 @@ malloc(uint nbytes)
     base.s.size = 0;
   }
   for(p = prevp->s.ptr; ; prevp = p, p = p->s.ptr){
+    printf(1, "p->s.size : %d\n", p->s.size);
+    printf(1, "nunits : %d\n", nunits);
     if(p->s.size >= nunits){
       if(p->s.size == nunits)
         prevp->s.ptr = p->s.ptr;
@@ -81,10 +84,13 @@ malloc(uint nbytes)
         p->s.size = nunits;
       }
       freep = prevp;
+      printf(1, "p : %d\n", p);
       return (void*)(p + 1);
     }
-    if(p == freep)
+    if(p == freep){
+      printf(1, "p == freep\n");
       if((p = morecore(nunits)) == 0)
         return 0;
+    }
   }
 }
