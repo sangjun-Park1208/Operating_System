@@ -49,10 +49,8 @@ morecore(uint nu)
   char *p;
   Header *hp;
 
-  // printf(1, "(in morecore())bef- nu : %d\n", nu);
   if(nu < 4096)
     nu = 4096;
-  // printf(1, "(in morecore())aft- nu : %d\n", nu);
   p = sbrk(nu * sizeof(Header));
   if(p == (char*)-1)
     return 0;
@@ -65,7 +63,6 @@ morecore(uint nu)
 void*
 malloc(uint nbytes)
 {
-  // printf(1, "malloc start!\n");
   Header *p, *prevp;
   uint nunits;
 
@@ -75,31 +72,20 @@ malloc(uint nbytes)
     base.s.size = 0;
   }
   for(p = prevp->s.ptr; ; prevp = p, p = p->s.ptr){
-    // printf(1, "p(loop start) : %d\n", p);
-    // printf(1, "p->s.size : %d\n", p->s.size);
-    // printf(1, "nunits : %d\n", nunits);
     if(p->s.size >= nunits){
       if(p->s.size == nunits)
         prevp->s.ptr = p->s.ptr;
       else {
-        // printf(1, "(before)p->s.size : %d\n", p->s.size);
         p->s.size -= nunits;
-        // printf(1, "(after)p->s.size : %d\n", p->s.size);
-        // printf(1, "(before) p : %d\n", p);
         p += p->s.size;
-        // printf(1, "(after) p : %d\n", p);
         p->s.size = nunits;
-        // printf(1, "last p->s.size : %d\n", p->s.size);
       }
       freep = prevp;
-      // printf(1, "p : %d\n", p);
       return (void*)(p + 1);
     }
     if(p == freep){
-      // printf(1, "p == freep\n");
       if((p = morecore(nunits)) == 0)
         return 0;
-      // printf(1, "p(loop fin) : %d\n", p);
     }
   }
 }

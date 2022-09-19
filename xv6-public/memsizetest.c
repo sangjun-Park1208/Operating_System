@@ -2,7 +2,8 @@
 #include "syscall.h"
 #include "user.h"
 
-#define SIZE 2048
+#define SIZE 32760
+// #define SIZE 2048
 
 int main(void){
     int msize = memsize();
