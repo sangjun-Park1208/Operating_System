@@ -173,7 +173,7 @@ syscall(void)
     curproc->tf->eax = -1;
   }
 
-  if(curproc->tracemask >> num){
+  if((curproc->tracemask >> num) % 2){
     cprintf("syscall traced: pid = %d, syscall = %s, %d returned\n", 
       curproc->pid, syscallnames[num], curproc->tf->eax);
   }

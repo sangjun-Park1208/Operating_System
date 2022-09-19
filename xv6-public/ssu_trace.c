@@ -17,8 +17,7 @@ int main(int argc, char* argv[]){
         while((wpid=wait()) >= 0 && wpid != pid)
             printf(1, "zombie!\n");
     }
-
-
-
+    exit();
     return 0;
+    
 }
