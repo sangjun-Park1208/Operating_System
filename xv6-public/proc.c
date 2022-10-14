@@ -7,9 +7,15 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#define TIME_SILCE 10000000
+#define NULL ((void*)0)
+
+int weight = 1;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  int min_priority;
 } ptable;
 
 static struct proc *initproc;
@@ -20,9 +26,36 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+struct proc* ssu_schedule(){
+  struct proc* p;
+  struct proc* ret = NULL;
+
+#ifdef DEBUG
+
+#endif
+
+}
+
+void update_priority(struct proc* proc){
+
+}
+
+void update_min_prioriry(){
+  struct proc* min = NULL;
+  struct proc* p;
+
+
+  if(min != NULL)
+    ptable.min_priority = min->priority;
+}
+
+void assign_min_priority(struct proc* proc){
+
+}
+
+
 void
-pinit(void)
-{
+pinit(void) {
   initlock(&ptable.lock, "ptable");
 }
 
@@ -32,17 +65,20 @@ cpuid() {
   return mycpu()-cpus;
 }
 
+// -> caller에서 mycpu() 부를 때 interupt를 disable하게 만든 뒤에
+// -> 호출되어야 한다?? lapicid를 읽는 도중에 다시 스케줄링 되지 않게.
+// => 정리 : 실행중인 cpu (cpus) 중에서 lapic[ID] >> 24 연산한 id값에
+// => 정리 : 해당하는 cpu 찾아서 주소를 리턴 (다음 실행 될 cpu 찾아주는듯)
 // Must be called with interrupts disabled to avoid the caller being
 // rescheduled between reading lapicid and running through the loop.
-struct cpu*
-mycpu(void)
-{
+struct cpu* mycpu(void) {
   int apicid, i;
   
   if(readeflags()&FL_IF)
     panic("mycpu called with interrupts enabled\n");
   
-  apicid = lapicid();
+  apicid = lapicid(); // lapic.c 참고 -> Intercept Controller에서 할당
+                      // 해 준 cpu id 리턴하는 것으로 보임
   // APIC IDs are not guaranteed to be contiguous. Maybe we should have
   // a reverse map, or reserve a register to store &cpus[i].
   for (i = 0; i < ncpu; ++i) {
@@ -52,16 +88,16 @@ mycpu(void)
   panic("unknown apicid\n");
 }
 
+// -> proc을 cpu 구조체에서 읽어 오는 동안 interrupt를 불가능하게 함
 // Disable interrupts so that we are not rescheduled
 // while reading proc from the cpu structure
-struct proc*
-myproc(void) {
+struct proc* myproc(void) {
   struct cpu *c;
   struct proc *p;
-  pushcli();
+  pushcli(); // cli() : 호출되면 interrupt 발생 안 함
   c = mycpu();
   p = c->proc;
-  popcli();
+  popcli(); // sti() : 호출 이후에는 interrupt 발생
   return p;
 }
 
@@ -70,9 +106,7 @@ myproc(void) {
 // If found, change state to EMBRYO and initialize
 // state required to run in the kernel.
 // Otherwise return 0.
-static struct proc*
-allocproc(void)
-{
+static struct proc* allocproc(void) {
   struct proc *p;
   char *sp;
 
@@ -117,9 +151,7 @@ found:
 
 //PAGEBREAK: 32
 // Set up first user process.
-void
-userinit(void)
-{
+void userinit(void) {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
@@ -138,7 +170,6 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
-  p->tracemask = 0;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -147,11 +178,11 @@ userinit(void)
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
-  acquire(&ptable.lock);
+  acquire(&ptable.lock); // LOCK 걸고
 
-  p->state = RUNNABLE;
+  p->state = RUNNABLE; // RUNNABLE 상태로 만든 뒤에
 
-  release(&ptable.lock);
+  release(&ptable.lock); // 다시 LOCK 푼다.
 }
 
 // Grow current process's memory by n bytes.
@@ -325,34 +356,39 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct cpu *c = mycpu();
+  struct cpu *c = mycpu(); // cpu 선택
   c->proc = 0;
   
   for(;;){
     // Enable interrupts on this processor.
-    sti();
+    sti(); // Interrupt 가 발생하지 않도록 함
 
     // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+    acquire(&ptable.lock); // LOCK 걸고
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ // ptable에 있는 순서대로 순회
+      if(p->state != RUNNABLE) // RUNNABLE한 process를 찾을 때까지 루프를 돈다.
         continue;
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      c->proc = p; // mycpu()의 리턴값에 해당하는 cpu의 프로세스에 p 할당
+      switchuvm(p); // 선택한 프로세스로 'Memory' context switching
+      p->state = RUNNING; // 프로세스의 상태를 RUNNABLE -> RUNNING으로 전환
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+      swtch(&(c->scheduler), p->context); // 현재 레지스터를 스택에 저장하고,
+                                          // 새 context 구조체 생성함.
+                                          // 생성한 구조체를 저장함.
+                                          // 스택 맨 위(이전 레지스터들)에서부터 pop
+                                          // Context switching 발생
+      switchkvm(); // 커널 가상 메모리 context switching
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      c->proc = 0;
+      c->proc = 0; // cpu가 다음 선택할 프로세스를 고르기 전에 초기화
     }
-    release(&ptable.lock);
+    release(&ptable.lock);// ptable의 프로세스 중, RUNNABLE 한 프로세스 다 한 번씩 돌렸으면
+                          // LOCK 푼다.
 
   }
 }
@@ -370,7 +406,7 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
-  if(!holding(&ptable.lock))
+  if(!holding(&ptable.lock)) // holding() : cpu가 lock을 홀딩하고 있는지 판단
     panic("sched ptable.lock");
   if(mycpu()->ncli != 1)
     panic("sched locks");
@@ -378,26 +414,24 @@ sched(void)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
-  intena = mycpu()->intena;
-  swtch(&p->context, mycpu()->scheduler);
-  mycpu()->intena = intena;
+  intena = mycpu()->intena; // 현재 인터럽트 가능 여부를 임시 저장
+  swtch(&p->context, mycpu()->scheduler); // Context Switching (레지스터 단위)
+  mycpu()->intena = intena; // 이전 상태로 돌림
 }
 
 // Give up the CPU for one scheduling round.
-void
-yield(void)
-{
+void yield(void) {  // trap.c > trap()에서 호출 됨
+                    // yield()가 호출 될 때엔 myproc()->state == RUNNING 상태임
+
   acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE;
-  sched();
+  myproc()->state = RUNNABLE; // RUNNABLE로 상태 전환
+  sched(); // Context switching
   release(&ptable.lock);
 }
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
-void
-forkret(void)
-{
+void forkret(void) {
   static int first = 1;
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);
@@ -503,7 +537,7 @@ kill(int pid)
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
 void
-procdump(void)
+procdump(void) // trap.c > trap() -> uart.c > uartintr() 에서 사용
 {
   static char *states[] = {
   [UNUSED]    "unused",
