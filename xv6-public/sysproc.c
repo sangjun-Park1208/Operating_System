@@ -90,15 +90,8 @@ sys_uptime(void)
   return xticks;
 }
 
-int sys_memsize(void){
-  uint size;
-  struct proc* p = myproc();
-  size = p->sz;
-  return size;
-}
-
-int sys_trace(void){
-  if(argint(0, &myproc()->tracemask) < 0)
-    return -1;
+int sys_weightset(void){
+  int weight;
+  if(argint(0, &weight) < 0 || weight==0) return -1;
   return 0;
 }

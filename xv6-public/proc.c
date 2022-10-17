@@ -9,13 +9,14 @@
 
 #define TIME_SILCE 10000000
 #define NULL ((void*)0)
+// #define DEBUG 1
 
 int weight = 1;
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  int min_priority;
+  long min_priority;
 } ptable;
 
 static struct proc *initproc;
@@ -30,28 +31,45 @@ struct proc* ssu_schedule(){
   struct proc* p;
   struct proc* ret = NULL;
 
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == RUNNABLE){
+      if(ret == NULL || ret->priority > p->priority)
+        ret = p;
+    }
+  }
+
 #ifdef DEBUG
-
+  if(ret)
+    cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: %d\n", ret->pid, ret->name, ret->weight, ret->priority);
 #endif
-
+  return ret; // ret값은 최소우선순위값을 갖는 프로세스 포인터
 }
 
-void update_priority(struct proc* proc){
-
+// for문 안에서 호출 되어야 할 듯?? (RUNNABLE 프로세스만을 대상으로)
+void update_priority(struct proc* proc){ // 인자로 받은 프로세스의 우선순위 값 갱신
+  proc->priority = proc->priority + (TIME_SILCE/proc->weight);
 }
 
-void update_min_prioriry(){
+// update_min_priority() 호출 시, ptable 순회를 통해 RUNNABLE한 프로세스 중 최소우선순위 값을 뽑아야 함
+// 뽑은 최소우선순위값을 ptable에 저장
+void update_min_priority(){
   struct proc* min = NULL;
   struct proc* p;
 
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == RUNNABLE)
+      if(min==NULL || min->priority > p->priority)
+        min = p;
+  }
 
   if(min != NULL)
     ptable.min_priority = min->priority;
 }
 
-void assign_min_priority(struct proc* proc){
-
+void assign_min_priority(struct proc* proc){ // 인자로 받은 proc->priority 를 ptable.min_priority로 할당
+  proc->priority = ptable.min_priority;
 }
+
 
 
 void
@@ -119,10 +137,13 @@ static struct proc* allocproc(void) {
   release(&ptable.lock);
   return 0;
 
-found:
+found: // 사용하지 않는 프로세스 찾으면
+  
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->weight = weight;
+  weight++; // 가중치++ : 다음 allocproc() 호출 시 1 증가된 값으로 new_priority 계산
+  assign_min_priority(p); // 최소우선순위값으로 p의 우선순위 할당
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -155,7 +176,8 @@ void userinit(void) {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc();
+  ptable.min_priority = 3; // 우선순위 시작 값 3으로 설정
+  p = allocproc(); // 최소의 우선순위를 갖는 프로세스를 p에 할당
   
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
@@ -231,7 +253,6 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  np->tracemask = curproc->tracemask;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -360,36 +381,29 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
-    // Enable interrupts on this processor.
-    sti(); // Interrupt 가 발생하지 않도록 함
+    sti(); // Interrupt 발생할 수 있도록 함
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock); // LOCK 걸고
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ // ptable에 있는 순서대로 순회
-      if(p->state != RUNNABLE) // RUNNABLE한 process를 찾을 때까지 루프를 돈다.
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p; // mycpu()의 리턴값에 해당하는 cpu의 프로세스에 p 할당
-      switchuvm(p); // 선택한 프로세스로 'Memory' context switching
-      p->state = RUNNING; // 프로세스의 상태를 RUNNABLE -> RUNNING으로 전환
-
-      swtch(&(c->scheduler), p->context); // 현재 레지스터를 스택에 저장하고,
-                                          // 새 context 구조체 생성함.
-                                          // 생성한 구조체를 저장함.
-                                          // 스택 맨 위(이전 레지스터들)에서부터 pop
-                                          // Context switching 발생
-      switchkvm(); // 커널 가상 메모리 context switching
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0; // cpu가 다음 선택할 프로세스를 고르기 전에 초기화
+    p = ssu_schedule();
+    if(p == NULL){
+      release(&ptable.lock);
+      continue;
     }
-    release(&ptable.lock);// ptable의 프로세스 중, RUNNABLE 한 프로세스 다 한 번씩 돌렸으면
-                          // LOCK 푼다.
 
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    update_priority(p);
+    update_min_priority();
+
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 
@@ -491,13 +505,17 @@ sleep(void *chan, struct spinlock *lk)
 // Wake up all processes sleeping on chan.
 // The ptable lock must be held.
 static void
-wakeup1(void *chan)
-{
+wakeup1(void *chan){  //기존 : SLEEPING 상태의 모든 process를 RUNNABLE로 바꿈
+                      //추가 : 상태전이 이후, RUNNABLE process가 달라졌으므로 다시 우선순위 계산
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      assign_min_priority(p);
+    }
+  }
+
 }
 
 // Wake up all processes sleeping on chan.
@@ -567,4 +585,10 @@ procdump(void) // trap.c > trap() -> uart.c > uartintr() 에서 사용
     }
     cprintf("\n");
   }
+}
+
+void do_weightset(int weight){
+  acquire(&ptable.lock);
+  myproc()->weight = weight;
+  release(&ptable.lock);
 }
