@@ -9,7 +9,6 @@
 
 #define TIME_SILCE 10000000
 #define NULL ((void*)0)
-// #define DEBUG 1
 
 int weight = 1;
 
@@ -45,7 +44,7 @@ struct proc* ssu_schedule(){
   return ret; // ret값은 최소우선순위값을 갖는 프로세스 포인터
 }
 
-// for문 안에서 호출 되어야 할 듯?? (RUNNABLE 프로세스만을 대상으로)
+// (RUNNABLE 프로세스만을 대상으로)
 void update_priority(struct proc* proc){ // 인자로 받은 프로세스의 우선순위 값 갱신
   proc->priority = proc->priority + (TIME_SILCE/proc->weight);
 }
@@ -84,7 +83,7 @@ cpuid() {
 }
 
 // -> caller에서 mycpu() 부를 때 interupt를 disable하게 만든 뒤에
-// -> 호출되어야 한다?? lapicid를 읽는 도중에 다시 스케줄링 되지 않게.
+// -> 호출되어야 한다. lapicid를 읽는 도중에 다시 스케줄링 되지 않게.
 // => 정리 : 실행중인 cpu (cpus) 중에서 lapic[ID] >> 24 연산한 id값에
 // => 정리 : 해당하는 cpu 찾아서 주소를 리턴 (다음 실행 될 cpu 찾아주는듯)
 // Must be called with interrupts disabled to avoid the caller being
@@ -115,7 +114,7 @@ struct proc* myproc(void) {
   pushcli(); // cli() : 호출되면 interrupt 발생 안 함
   c = mycpu();
   p = c->proc;
-  popcli(); // sti() : 호출 이후에는 interrupt 발생
+  popcli(); // sti() : 호출 이후에는 interrupt 발생 가능
   return p;
 }
 
@@ -386,7 +385,8 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock); // LOCK 걸고
 
-    p = ssu_schedule();
+    p = ssu_schedule(); // ssu_schedule() : 현재 RUNNABLE 프로세스 중
+                        // 최소 우선순위값을 갖는 프로세스 포인터 리턴
     if(p == NULL){
       release(&ptable.lock);
       continue;
@@ -428,9 +428,9 @@ sched(void)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
-  intena = mycpu()->intena; // 현재 인터럽트 가능 여부를 임시 저장
+  intena = mycpu()->intena; // (1)현재 인터럽트 가능 여부를 임시 저장
   swtch(&p->context, mycpu()->scheduler); // Context Switching (레지스터 단위)
-  mycpu()->intena = intena; // 이전 상태로 돌림
+  mycpu()->intena = intena; // 이전 상태(1)로 되돌림
 }
 
 // Give up the CPU for one scheduling round.
@@ -438,7 +438,7 @@ void yield(void) {  // trap.c > trap()에서 호출 됨
                     // yield()가 호출 될 때엔 myproc()->state == RUNNING 상태임
 
   acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE; // RUNNABLE로 상태 전환
+  myproc()->state = RUNNABLE; // RUNNABLE 상태로 전환
   sched(); // Context switching
   release(&ptable.lock);
 }
