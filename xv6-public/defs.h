@@ -120,7 +120,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-void            do_weightset(int);
+void            do_weightset(int); // 함수 추가
 
 // swtch.S
 void            swtch(struct context**, struct context*);

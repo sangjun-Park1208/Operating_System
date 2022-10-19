@@ -90,8 +90,8 @@ sys_uptime(void)
   return xticks;
 }
 
-int sys_weightset(void){
+int sys_weightset(void){ // weightset 시스템콜 추가
   int weight;
-  if(argint(0, &weight) < 0 || weight==0) return -1;
+  if(argint(0, &weight) < 0 || weight==0) return -1; // 인자 값이 0인 경우 -1 리턴해서 에러 처리
   return 0;
 }

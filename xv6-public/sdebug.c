@@ -1,4 +1,3 @@
-// 필요한 Header file
 #include "types.h"
 #include "user.h"
 
@@ -11,13 +10,12 @@ void sdebug_func(void){
     int weight_ = 1;
     printf(1, "start sdebug command\n");
 
-    for(n=0; n<PNUM; n++){
+    for(n=0; n<PNUM; n++, weight_++){
         pid = fork();
-        if(pid < 0)
+        if(pid < 0) // fork 예외처리
             break;
-        if(pid == 0){
-            // 힌트 : counter, print_counter 변수 초기화, first 변수 초기화, end_ticks
-            if(weightset(weight_)<0){
+        if(pid == 0){ // 자식 프로세스
+            if(weightset(weight_) < 0){ // weightset 시스템콜에 인자로 가중치 1부터 증가시키면서 프로세스별로 할당
                 printf(1,"weight error\n");
                 exit();
             }
@@ -26,23 +24,22 @@ void sdebug_func(void){
             int first = 1;
             int start_ticks = uptime();
             int end_ticks;
-            while(counter <= TOTAL_COUNTER){
-                counter++;
+            while(counter <= TOTAL_COUNTER){ 
+                counter++; // 종료 조건 : counter값이 5억보다 커지는 경우
                 if(print_counter == 0){
                     if(first){
-                        end_ticks = uptime();
-                        printf(1, "PID: %d, WEIGHT: %d, ", getpid(), weight_);
-                        printf(1, "TIMES: %d ms\n", (end_ticks - start_ticks)*10);
+                        end_ticks = uptime(); // 한 번만 출력하기 위해 first변수로 처음인지 체크. 
+                        printf(1, "PID: %d, WEIGHT: %d, TIMES: %d ms\n", getpid(), weight_, (end_ticks - start_ticks)*10);
+                        // printf(1, "TIMES: %d ms\n", (end_ticks - start_ticks)*10);
                         first = 0;
                     }
-                    print_counter = PRINT_CYCLE;
+                    print_counter = PRINT_CYCLE; // 실행 중인 프로세스 정보를 출력하는 주기(1천만)가 다 된 경우, 새로 할당
                 }
                 print_counter--;
             }
-            printf(1, "PID: %d terminated\n", getpid());
+            printf(1, "PID: %d terminated\n", getpid()); // 프로세스 종료
             exit();
         }
-        weight_++;
     }
 
     for(; n > 0; n--){

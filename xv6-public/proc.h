@@ -49,8 +49,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  long priority;
-  long weight;
+  long priority;                // 프로세스마다 우선순위 값이 할당되어야 함. 
+  long weight;                  // 선택한 프로세스의 가중치값이 있어야 함.
 };
 
 // Process memory is laid out contiguously, low addresses first:
