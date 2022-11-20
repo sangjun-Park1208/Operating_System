@@ -32,7 +32,6 @@ typedef struct Node {
 typedef struct Pageframe {
     Node* head;
     Node* tail;
-    Node* cur;
     Node* tmp;
     int size;
 } Pageframe;
@@ -56,11 +55,13 @@ int find_node(int);
 
 /* Algorithms */
 void FIFO();
+void LIFO();
 
 /* pageframe manipulate function */
 void initiate_Pageframe();
 
 /* print functions */
+void print_stream();
 void print_algorithm_type(int);
 void print_column();
 void print_result();
@@ -68,7 +69,7 @@ void print_pageframe(int, char*);
 
 int main(void){
     start_simulator();
-    print_column();
+    
     print_result();
 }
 
@@ -77,8 +78,21 @@ void start_simulator(){
     get_input1();
     get_input2();
     get_input3();
+    print_stream();
+    print_column();
 
-    FIFO();
+    for(int i=0; i<input1_cnt; i++){
+        switch (input1[i]){
+        case 2:
+            FIFO();
+            break;
+        case 3:
+            LIFO();
+            break;
+        default:
+            break;
+        }
+    }
 
     printf("Exit Program..\n");
 }
@@ -129,14 +143,14 @@ void get_input2(){
 void get_input3(){
     while(1){
         printf("Select data input style. (1~2)\n");
-        printf("(1)Random  (2)User file open\n >> ");
+        printf("(1)Random  (2)User file open\n");
         scanf("%d", &input3);
         if(input3 < 1 || input3 > 2){
             printf("Usage: input number should be '1' or '2'. Try again.\n");
             continue;
         }
 
-        printf("Input Page stream count (bigger than 500).\n >> ");
+        printf("Input Page stream count (bigger than 500).\n");
         scanf("%d", &PAGE_STREAM_NUM);
         // if(PAGE_STREAM_NUM < 500){
         //     printf("Usage: Page stream count must be bigger than 500. Try again.\n");
@@ -165,10 +179,8 @@ void set_random_stream() {
     RANDOM_STREAM = (int*)malloc(sizeof(int)*PAGE_STREAM_NUM);
 
     srand((unsigned int)time(NULL));
-    printf("<STREAM>\n");
     for(int i=0; i<PAGE_STREAM_NUM; i++){
-        RANDOM_STREAM[i] = rand()%30 + 1;
-        printf("%d ", RANDOM_STREAM[i]);
+        RANDOM_STREAM[i] = rand()%10 + 1;
     }
     printf("\n");
 }
@@ -190,49 +202,64 @@ void print_algorithm_type(int type_num) {
     printf("[%s] Simulator\n", algorithm_type[type_num]);
 }
 void print_column() {
-    printf("================================================================================================================================================================\n");
     printf("Stream\t\t");
     printf("Result\t\t");
     for(int i=0; i<PAGEFRAME_NUM; i++){
-        printf("Pageframe[%d]\t\t\t", i);
+        printf("Pageframe[%d]\t\t", i);
     }
-    printf("\n----------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+    printf("\n");
 }
 void print_pageframe(int stream, char* result) {
-    // printf("in print_pageframe\n");
     printf("%d\t\t%s\t\t", stream, result);
-
     pageframe->tmp = pageframe->head;
-    while (pageframe->tmp->page != pageframe->tail->page){
+    while(1){
         printf("%d\t\t\t", pageframe->tmp->page);
+        if(pageframe->tmp == pageframe->tail) break;
         pageframe->tmp = pageframe->tmp->next;
     }
     printf("\n");
+
 }
 void print_result() {
     printf("\n\n*******RESULT*******\n");
     printf(" [HIT] :  %d\n", HIT_CNT);
     printf("[MISS] :  %d\n", MISS_CNT);
-    printf("================================================================================================================================================================\n");
+}
+void print_stream() {
+    printf("stream : ");
+    for(int i=0; i<PAGE_STREAM_NUM; i++){
+        printf("%d ", RANDOM_STREAM[i]);
+    }
+    printf("\n");
 }
 void print_page_stream() {
 
 }
-
+void print_Allpageframe() {
+    if(pageframe->head == NULL) { return;}
+    pageframe->tmp = pageframe->head;
+    while (1){
+        printf("%d", pageframe->tmp->page);
+        if(pageframe->tmp == pageframe->tail) break;
+        pageframe->tmp = pageframe->tmp->next;
+        printf("->");
+    }
+    // printf("/ head: %d, tail: %d\n", pageframe->head->page, pageframe->tail->page);
+    
+}
 
 
 Node* create_node(int page) {
-    // printf("in create_node\n");
     Node* newNode = (Node*)malloc(sizeof(Node));
     newNode->page = page;
-
+    newNode->next = NULL;
+    newNode->prev = NULL;
     return newNode;
 }
-void append_node(int page) { // pageframe->size 가 입력받은 pageframe 크기보다 작을 때는 무조건 append
-    // printf("in append_node\n");
+void append_node(int page) {
     MISS_CNT++;
     if(pageframe->head == NULL){ // 없으면 초기화
-        pageframe->head = pageframe->tail = pageframe->cur = create_node(page);
+        pageframe->head = pageframe->tail = create_node(page);
         pageframe->size++;
         return;
     }
@@ -243,61 +270,86 @@ void append_node(int page) { // pageframe->size 가 입력받은 pageframe 크�
     pageframe->size++;
     return;
 }
-int find_node(int page) { 
-    // printf("in find_node\n");
+int find_node(int page) {
+
+    // print_Allpageframe();
+    if(pageframe->head == NULL) {
+        return 0;
+    }
     pageframe->tmp = pageframe->head;
-    while (pageframe->tmp->page != pageframe->tail->page){
-        if (pageframe->tmp->page == page)
-            return 1;
+    while(1){
+        // printf("tmp->page : %d, page : %d\n", pageframe->tmp->page, page);
+        if(pageframe->tmp->page == page) return 1;
+        if(pageframe->tmp == pageframe->tail) {break;}
         pageframe->tmp = pageframe->tmp->next;
     }
     return 0; // Not Found
 }
 void initiate_Pageframe() {
-    // printf("in initiate_Pageframe\n");
     pageframe = (Pageframe*)malloc(sizeof(Pageframe));
-    pageframe->head = pageframe->tail = pageframe->cur = NULL;
+    pageframe->head = pageframe->tail = NULL;
 }
 
 
-
-
-// find_node() 함수도 각 알고리즘 별로 만들어야 함. (중요)
-
-
-
 void FIFO() {
-    // printf("in FIFO\n");
-    int isFound;
-    int pageframecnt=0;
+    HIT_CNT = MISS_CNT = 0;
     initiate_Pageframe();
     Node* tmp;
-    for(int i=0; i < PAGE_STREAM_NUM; i++){ // 500회 수행
-        if(i<PAGEFRAME_NUM){
-            // printf("in first if block\n");
-            pageframecnt++;
+    for(int i=0; i < PAGE_STREAM_NUM; i++){
+
+        if (find_node(RANDOM_STREAM[i])) { // HIT 구간
+            print_pageframe(RANDOM_STREAM[i], "HIT");
+            continue;
+        }
+        if(pageframe->size < PAGEFRAME_NUM){ // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
             append_node(RANDOM_STREAM[i]);
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
         
-        if(find_node(RANDOM_STREAM[i])){
-            // printf("in second if block\n");
-            print_page_stream(RANDOM_STREAM[i], "HIT");
-            continue;
-        }
-        /* head(first in) node 삭제 */
+        /* head 없애고 */
         tmp = pageframe->head->next;
-        tmp->prev = NULL;
         pageframe->head->next = NULL;
+        free(pageframe->head);
         pageframe->head = tmp;
 
         /* tail(last in) node 추가 */
         append_node(RANDOM_STREAM[i]);
-        // printf("not in if block\n");
         print_pageframe(RANDOM_STREAM[i], "MISS");
+
+        // print_Allpageframe();
     }
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
-    printf("cnt : %d\n", pageframecnt);
+}
+
+void LIFO() {
+    HIT_CNT = MISS_CNT = 0;
+    initiate_Pageframe();
+    Node *tmp, *newNode;
+    for (int i = 0; i < PAGE_STREAM_NUM; i++){
+
+        if (find_node(RANDOM_STREAM[i])){ // HIT 구간
+            print_pageframe(RANDOM_STREAM[i], "HIT");
+            continue;
+        }
+        if (pageframe->size < PAGEFRAME_NUM){ // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
+            append_node(RANDOM_STREAM[i]);
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+
+        /* 맨 뒤 노드 replace */
+        newNode = create_node(RANDOM_STREAM[i]);
+        tmp = pageframe->tail->prev;
+        tmp->next = newNode;
+        newNode->prev = tmp;
+        free(pageframe->tail);
+        pageframe->tail = newNode;
+
+        print_pageframe(RANDOM_STREAM[i], "MISS");
+        // print_Allpageframe();
+    }
+
+    HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
