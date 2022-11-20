@@ -19,11 +19,12 @@ int PAGE_STREAM_NUM;
 
 int* RANDOM_STREAM;
 
+int reference_cnt[31];
+
 typedef struct Node {
     struct Node* next;
     struct Node* prev;
     int page;
-    int ref_cnt; // reference count : 
     int ref_bit;
     int read_bit;
     int write_bit;
@@ -57,6 +58,7 @@ Node* find_node(int);
 void FIFO();
 void LIFO();
 void LRU();
+void LFU();
 
 /* pageframe manipulate function */
 void initiate_Pageframe();
@@ -92,6 +94,9 @@ void start_simulator(){
             break;
         case 4:
             LRU();
+            break;
+        case 5:
+            LFU();
             break;
         default:
             break;
@@ -402,16 +407,12 @@ void LRU() {
         }
 
         // 1) newNode를 맨 뒤에 붙임
-        // 2) tail = newnode
-        // 3) head = head->next
-
-        // 1)
         newNode = create_node(RANDOM_STREAM[i]);
         pageframe->tail->next = newNode;
         newNode->prev = pageframe->tail;
-        // 2)
+        // 2) tail = newnode 
         pageframe->tail = newNode;
-        // 3)
+        // 3) head = head->next
         tmp = pageframe->head->next;
         tmp->prev = NULL;
         free(pageframe->head);
@@ -419,6 +420,53 @@ void LRU() {
         MISS_CNT++;
         print_pageframe(RANDOM_STREAM[i], "MISS");
     }
+    HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
+}
+
+void LFU() {
+    HIT_CNT = MISS_CNT = 0;
+    initiate_Pageframe();
+    Node *tmp, *maxNode;
+    int max = 0;
+    for (int i = 0; i < PAGE_STREAM_NUM; i++){
+
+        if (find_node(RANDOM_STREAM[i])) { // HIT 구간
+            reference_cnt[RANDOM_STREAM[i]]++;
+            print_pageframe(RANDOM_STREAM[i], "HIT");
+            continue;
+        }
+        if (pageframe->size < PAGEFRAME_NUM) { // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
+            append_node(RANDOM_STREAM[i]);
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+
+        // tmp = pageframe->head;
+        // while(1){
+        //     if(max < reference_cnt[tmp->page]){
+        //         max = reference_cnt[tmp->page];
+        //         maxNode = tmp;
+        //     }
+        //     if(tmp == pageframe->tail) break;
+
+        //     tmp = tmp->next;
+        // }
+
+        // if(maxNode == pageframe->head){
+        //     maxNode->next = pageframe->head->next;
+        //     free(pageframe->head);
+        //     pageframe->head = maxNode;
+        //     continue;
+        // }
+        // if(maxNode == pageframe->tail){
+        //     pageframe->tail->prev->next = maxNode;
+        //     free(pageframe->tail);
+        //     pageframe->tail = maxNode;
+        //     continue;
+        // }
+
+    }
+
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
 
