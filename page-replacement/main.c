@@ -51,11 +51,12 @@ int split(char*, char*, char*[]);
 /* node manipulate functions */
 Node* create_node(int);
 void append_node(int);
-int find_node(int);
+Node* find_node(int);
 
 /* Algorithms */
 void FIFO();
 void LIFO();
+void LRU();
 
 /* pageframe manipulate function */
 void initiate_Pageframe();
@@ -88,6 +89,9 @@ void start_simulator(){
             break;
         case 3:
             LIFO();
+            break;
+        case 4:
+            LRU();
             break;
         default:
             break;
@@ -270,20 +274,20 @@ void append_node(int page) {
     pageframe->size++;
     return;
 }
-int find_node(int page) {
+Node* find_node(int page) {
 
     // print_Allpageframe();
     if(pageframe->head == NULL) {
-        return 0;
+        return NULL;
     }
     pageframe->tmp = pageframe->head;
     while(1){
         // printf("tmp->page : %d, page : %d\n", pageframe->tmp->page, page);
-        if(pageframe->tmp->page == page) return 1;
+        if(pageframe->tmp->page == page) return pageframe->tmp;
         if(pageframe->tmp == pageframe->tail) {break;}
         pageframe->tmp = pageframe->tmp->next;
     }
-    return 0; // Not Found
+    return NULL; // Not Found
 }
 void initiate_Pageframe() {
     pageframe = (Pageframe*)malloc(sizeof(Pageframe));
@@ -353,3 +357,68 @@ void LIFO() {
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
+
+void LRU() {
+    HIT_CNT = MISS_CNT = 0;
+    initiate_Pageframe();
+    Node *hitNode, *newNode, *tmp;
+    for (int i = 0; i < PAGE_STREAM_NUM; i++){
+
+        if (hitNode = find_node(RANDOM_STREAM[i])){ // HIT 구간
+            /* change_sequence() */
+            if(pageframe->size == 1) {
+                print_pageframe(RANDOM_STREAM[i], "HIT");
+                continue;
+            }
+            if(pageframe->size > 1) {
+                if(hitNode == pageframe->tail) { print_pageframe(RANDOM_STREAM[i], "HIT"); continue;}
+                if(hitNode == pageframe->head) {
+                    tmp = pageframe->head;
+                    pageframe->head = pageframe->head->next;
+                    // tmp->next = pageframe->head; 
+                    tmp->next = NULL;
+                    pageframe->head->prev = NULL;
+                    pageframe->tail->next = tmp;
+                    tmp->prev = pageframe->tail;
+                    pageframe->tail = tmp;
+                    print_pageframe(RANDOM_STREAM[i], "HIT");
+                    continue;
+                }
+                hitNode->prev->next = hitNode->next;
+                hitNode->next->prev = hitNode->prev;
+                pageframe->tail->next = hitNode;
+                hitNode->prev = pageframe->tail;
+                hitNode->next = NULL;
+                pageframe->tail = hitNode;
+                print_pageframe(RANDOM_STREAM[i], "HIT");
+                continue;
+            }
+        }
+
+        if (pageframe->size < PAGEFRAME_NUM){ // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
+            append_node(RANDOM_STREAM[i]);
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+
+        // 1) newNode를 맨 뒤에 붙임
+        // 2) tail = newnode
+        // 3) head = head->next
+
+        // 1)
+        newNode = create_node(RANDOM_STREAM[i]);
+        pageframe->tail->next = newNode;
+        newNode->prev = pageframe->tail;
+        // 2)
+        pageframe->tail = newNode;
+        // 3)
+        tmp = pageframe->head->next;
+        tmp->prev = NULL;
+        free(pageframe->head);
+        pageframe->head = tmp;
+        MISS_CNT++;
+        print_pageframe(RANDOM_STREAM[i], "MISS");
+    }
+    HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
+}
+
