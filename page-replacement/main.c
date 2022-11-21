@@ -72,6 +72,7 @@ void LIFO();
 void LRU();
 void LFU();
 void SC();
+void ALL();
 
 /* pageframe manipulate function */
 void initiate_Pageframe();
@@ -82,7 +83,7 @@ void print_algorithm_type(int);
 void print_column();
 void print_result();
 void print_pageframe(int, char*);
-
+ 
 int main(void){
     start_simulator();
     return 0;
@@ -116,12 +117,14 @@ void start_simulator(){
     for(int i=0; i<input1_cnt; i++){
         print_algorithm_type(input1[i]);
 
-        if((fd = open(algorithm_type_filename[input1[i]], O_RDWR | O_CREAT | O_TRUNC)) < 0){
+        if(input1[i]!=8 && ((fd = open(algorithm_type_filename[input1[i]], O_RDWR | O_CREAT | O_TRUNC)) < 0)){
             printf("open error in %s\n", algorithm_type_filename[input1[i]]);
             exit(1);
         }
-        print_stream();
-        print_column();
+        if(input1[i] != 8){
+            print_stream();
+            print_column();
+        }
         switch (input1[i]){
             case 1:
                 Optimal();
@@ -141,6 +144,10 @@ void start_simulator(){
             case 6:
                 SC();
                 break;
+            case 8:
+                close(fd);
+                ALL();
+                return;
             default:
                 break;
         }
@@ -556,7 +563,7 @@ void LIFO() {
         newNode->prev = tmp;
         free(pageframe->tail);
         pageframe->tail = newNode;
-
+        MISS_CNT++;
         print_pageframe(RANDOM_STREAM[i], "MISS");
         // print_Allpageframe();
     }
@@ -665,6 +672,7 @@ void LFU() {
             pageframe->head->next->prev = newNode;
             free(pageframe->head);
             pageframe->head = newNode;
+            MISS_CNT++;
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
@@ -673,6 +681,7 @@ void LFU() {
             newNode->prev = pageframe->tail->prev;
             free(pageframe->tail);
             pageframe->tail = newNode;
+            MISS_CNT++;
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
@@ -754,3 +763,36 @@ void SC() {
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
 
+void ALL() {
+    for(int i=1; i<7; i++){
+        print_algorithm_type(i);
+        if((fd = open(algorithm_type_filename[i], O_RDWR | O_CREAT | O_TRUNC)) < 0){
+            printf("open error in %s\n", algorithm_type_filename[i]);
+            exit(1);
+        }
+        print_stream();
+        print_column();
+        switch (i){
+            case 1:
+                Optimal();
+                break;
+            case 2:
+                FIFO();
+                break;
+            case 3:
+                LIFO();
+                break;
+            case 4:
+                LRU();
+                break;
+            case 5:
+                LFU();
+                break;
+            case 6:
+                SC();
+                break;
+        }
+        print_result();
+        close(fd);
+    }
+}
