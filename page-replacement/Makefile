@@ -5,4 +5,4 @@ main.o: main.c
 	gcc -c main.c
 
 clean: 
-	rm -f main.o main
+	rm -f main.o main *.txt

@@ -6,8 +6,12 @@
 #include <time.h>
 
 #define BIGNUM 9999999
+#define BUF_SIZE 5
+#define PRINT_BUF_SIZE 1024
 
+char print_buf[PRINT_BUF_SIZE];
 char* algorithm_type[9] = {"", "Optimal", "FIFO", "LIFO", "LRU", "LFU", "SC", "ESC", "ALL"};
+char* algorithm_type_filename[9] = {"", "Optimal.txt", "FIFO.txt", "LIFO.txt", "LRU.txt", "LFU.txt", "SC.txt", "ESC.txt", ""};
 
 int* input1;
 int input1_cnt;
@@ -22,6 +26,8 @@ int PAGE_STREAM_NUM;
 int* RANDOM_STREAM;
 
 int reference_cnt[31]; // For LFU Algorithm
+
+int fd;
 
 typedef struct Node {
     struct Node* next;
@@ -48,6 +54,7 @@ void get_input2();
 void get_input3();
 
 void set_random_stream();
+void set_random_stream_to_file(int);
 
 /* string manipulate functions */
 int split(char*, char*, char*[]);
@@ -78,19 +85,43 @@ void print_pageframe(int, char*);
 
 int main(void){
     start_simulator();
-    
-    print_result();
+    return 0;
 }
 
+int hasOptimal() {
+    for(int i=0; i<input1_cnt; i++){
+        if(input1[i] == 1) return 1;
+    }
+    return 0;
+}
 
 void start_simulator(){
     get_input1();
     get_input2();
     get_input3();
-    print_stream();
-    print_column();
+
+    if(!hasOptimal()) {
+        if((fd = open(algorithm_type_filename[1], O_RDWR | O_CREAT | O_TRUNC)) < 0){
+            printf("open error in %s\n", algorithm_type_filename[1]);
+            exit(1);
+        }
+        print_algorithm_type(1);
+        print_stream();
+        print_column();
+        Optimal();
+        print_result();
+        close(fd);
+    }
 
     for(int i=0; i<input1_cnt; i++){
+        print_algorithm_type(input1[i]);
+
+        if((fd = open(algorithm_type_filename[input1[i]], O_RDWR | O_CREAT | O_TRUNC)) < 0){
+            printf("open error in %s\n", algorithm_type_filename[input1[i]]);
+            exit(1);
+        }
+        print_stream();
+        print_column();
         switch (input1[i]){
             case 1:
                 Optimal();
@@ -112,7 +143,9 @@ void start_simulator(){
                 break;
             default:
                 break;
-            }
+        }
+        print_result();
+        close(fd);
     }
 
     printf("Exit Program..\n");
@@ -164,7 +197,7 @@ void get_input2(){
 void get_input3(){
     while(1){
         printf("Select data input style. (1~2)\n");
-        printf("(1)Random  (2)User file open\n");
+        printf("(1)Random  (2)User File open\n");
         scanf("%d", &input3);
         if(input3 < 1 || input3 > 2){
             printf("Usage: input number should be '1' or '2'. Try again.\n");
@@ -178,19 +211,16 @@ void get_input3(){
         //     continue;
         // }
 
-        set_random_stream();
+
+        if(input3 == 1) set_random_stream();
         if(input3 == 2){
-            int fd;
-            if((fd = open("input.txt", O_RDWR | O_CREAT | O_TRUNC)) < 0){
+            int fd_;
+            if((fd_ = open("input.txt", O_RDWR | O_CREAT | O_TRUNC)) < 0){
                 printf("open error in input.txt\n");
                 exit(1);
             }
-
-            for(int i=0; i<PAGE_STREAM_NUM; i++){
-                // write(fd, RANDOM_STREAM, sizeof(int)*PAGE_STREAM_NUM);
-
-            }
-
+            set_random_stream_to_file(fd_);
+            close(fd_);
         }
         break;
     }
@@ -201,7 +231,44 @@ void set_random_stream() {
 
     srand((unsigned int)time(NULL));
     for(int i=0; i<PAGE_STREAM_NUM; i++){
-        RANDOM_STREAM[i] = rand()%10 + 1;
+        RANDOM_STREAM[i] = rand()%30 + 1;
+    }
+    printf("\n");
+}
+
+void set_random_stream_to_file(int fd_) {
+    RANDOM_STREAM = (int*)malloc(sizeof(int)*PAGE_STREAM_NUM);
+    char RANDOM_STREAM_STR[3];
+    char buf[BUF_SIZE] = {'\0', };
+    char c[1];
+    int k=0;
+
+    srand((unsigned int)time(NULL));
+    // printf("DEBUG0\n");
+    int s;
+    for(int i=0; i<PAGE_STREAM_NUM; i++){
+        s = rand()%30 + 1;
+        sprintf(RANDOM_STREAM_STR, "%d ", s);
+        // printf("%s", RANDOM_STREAM_STR);
+        if(s<10) write(fd_, RANDOM_STREAM_STR, 2);
+        if(s>=10) write(fd_, RANDOM_STREAM_STR, 3);
+        memset(RANDOM_STREAM_STR, '\0', 3);
+    }
+    printf("\n");
+
+    lseek(fd_, 0, SEEK_SET);
+    // printf("DEBUG1\n");
+    while(read(fd_, c, 1) > 0){
+        if(strcmp(c, " ")) { // 공백이 아니면
+            strcat(buf, c);
+            continue;
+        }
+
+        // 공백이면
+        RANDOM_STREAM[k] = atoi(buf);
+        // printf("%d ", RANDOM_STREAM[k]);
+        memset(buf, '\0', BUF_SIZE);
+        k++;
     }
     printf("\n");
 }
@@ -225,37 +292,62 @@ void print_algorithm_type(int type_num) {
 void print_column() {
     printf("Stream\t\t");
     printf("Result\t\t");
+    sprintf(print_buf, "Stream\t\tResult\t\t");
+    write(fd, print_buf, PRINT_BUF_SIZE);
+    memset(print_buf, '\0', PRINT_BUF_SIZE);
+
     for(int i=0; i<PAGEFRAME_NUM; i++){
         printf("Pageframe[%d]\t\t", i);
+        sprintf(print_buf, "Pageframe[%d]\t\t", i);
+        write(fd, print_buf, PRINT_BUF_SIZE);
+        memset(print_buf, '\0', PRINT_BUF_SIZE);
     }
     printf("\n");
+    write(fd, "\n", 2);
 }
 void print_pageframe(int stream, char* result) {
     printf("%d\t\t%s\t\t", stream, result);
+    sprintf(print_buf, "%d\t\t%s\t\t", stream, result);
+    write(fd, print_buf, PRINT_BUF_SIZE);
+    memset(print_buf, '\0', PRINT_BUF_SIZE);
+
     pageframe->tmp = pageframe->head;
     while(1){
         printf("%d\t\t\t", pageframe->tmp->page);
+        sprintf(print_buf, "%d\t\t\t", pageframe->tmp->page);
+        write(fd, print_buf, PRINT_BUF_SIZE);
+        memset(print_buf, '\0', PRINT_BUF_SIZE);
+
         if(pageframe->tmp == pageframe->tail) break;
         pageframe->tmp = pageframe->tmp->next;
     }
     printf("\n");
+    write(fd, "\n", 2);
 
 }
 void print_result() {
-    printf("\n\n*******RESULT*******\n");
+    printf("\n*******RESULT*******\n");
     printf(" [HIT] :  %d\n", HIT_CNT);
     printf("[MISS] :  %d\n", MISS_CNT);
+    printf("********************\n\n\n");
+    sprintf(print_buf, "\n*******RESULT*******\n [HIT] :  %d\n[MISS] :  %d\n********************\n", HIT_CNT, MISS_CNT);
+
+    write(fd, print_buf, PRINT_BUF_SIZE);
+    memset(print_buf, '\0', PRINT_BUF_SIZE);
 }
 void print_stream() {
     printf("stream : ");
+    write(fd, "stream: ", 9);
     for(int i=0; i<PAGE_STREAM_NUM; i++){
         printf("%d ", RANDOM_STREAM[i]);
+        sprintf(print_buf, "%d ", RANDOM_STREAM[i]);
+        write(fd, print_buf, PRINT_BUF_SIZE);
+        memset(print_buf, '\0', PRINT_BUF_SIZE);
     }
     printf("\n");
+    write(fd, "\n", 2);
 }
-void print_page_stream() {
 
-}
 void print_Allpageframe() {
     if(pageframe->head == NULL) { return;}
     pageframe->tmp = pageframe->head;
