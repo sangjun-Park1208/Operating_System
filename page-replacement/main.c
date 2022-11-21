@@ -59,6 +59,7 @@ void append_node_circular(int);
 Node* find_node(int);
 
 /* Algorithms */
+void Optimal();
 void FIFO();
 void LIFO();
 void LRU();
@@ -91,24 +92,27 @@ void start_simulator(){
 
     for(int i=0; i<input1_cnt; i++){
         switch (input1[i]){
-        case 2:
-            FIFO();
-            break;
-        case 3:
-            LIFO();
-            break;
-        case 4:
-            LRU();
-            break;
-        case 5:
-            LFU();
-            break;
-        case 6:
-            SC();
-            break;
-        default:
-            break;
-        }
+            case 1:
+                Optimal();
+                break;
+            case 2:
+                FIFO();
+                break;
+            case 3:
+                LIFO();
+                break;
+            case 4:
+                LRU();
+                break;
+            case 5:
+                LFU();
+                break;
+            case 6:
+                SC();
+                break;
+            default:
+                break;
+            }
     }
 
     printf("Exit Program..\n");
@@ -323,6 +327,85 @@ Node* find_node(int page) {
 void initiate_Pageframe() {
     pageframe = (Pageframe*)malloc(sizeof(Pageframe));
     pageframe->head = pageframe->tail = NULL;
+}
+
+
+
+void Optimal() {
+    HIT_CNT = MISS_CNT = 0;
+    initiate_Pageframe();
+    Node* tmp, *replaceNode, *newNode;
+    int j, max, out;
+    for(int i=0; i < PAGE_STREAM_NUM; i++){
+        replaceNode = NULL;
+        if (find_node(RANDOM_STREAM[i])) { // HIT 구간
+            print_pageframe(RANDOM_STREAM[i], "HIT");
+            continue;
+        }
+        if(pageframe->size < PAGEFRAME_NUM){ // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
+            append_node(RANDOM_STREAM[i]);
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+
+        tmp = pageframe->head;
+        max = 0;
+        out = 0;
+        while(out == 0){
+            // 교체 대상 찾기
+            for(j = i; j < PAGE_STREAM_NUM; j++){
+                if(tmp->page == RANDOM_STREAM[j]){
+                    if(max < j){ // 갱신
+                        max = j;
+                        replaceNode = tmp;
+                    }
+                    break;
+                }
+                if(j == PAGE_STREAM_NUM-1){
+                    replaceNode = tmp;
+                    out = 1;
+                    break;
+                }
+            }
+
+            if(tmp == pageframe->tail) break;
+            tmp = tmp->next;
+        }
+
+        // replaceNode가 정해지지 않은 경우 == 뒤에 같은 숫자가 안 나오는 경우
+        if(replaceNode == NULL) replaceNode = pageframe->head;
+
+    // replaceNode <-> newNode
+        newNode = create_node(RANDOM_STREAM[i]);
+        if(replaceNode == pageframe->head){
+            newNode->next = pageframe->head->next;
+            pageframe->head->next->prev = newNode;
+            free(pageframe->head);
+            pageframe->head = newNode;
+            MISS_CNT++;
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+        if(replaceNode == pageframe->tail){
+            newNode->prev = pageframe->tail->prev;
+            pageframe->tail->prev->next = newNode;
+            free(pageframe->tail);
+            pageframe->tail = newNode;
+            MISS_CNT++;
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+        newNode->prev = replaceNode->prev;
+        replaceNode->prev->next = newNode;
+        newNode->next = replaceNode->next;
+        replaceNode->next->prev = newNode;
+        free(replaceNode);
+        MISS_CNT++;
+        print_pageframe(RANDOM_STREAM[i], "MISS");
+        
+    }
+
+    HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
 
 
@@ -578,3 +661,4 @@ void SC() {
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
 }
+
