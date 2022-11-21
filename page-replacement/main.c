@@ -5,6 +5,8 @@
 #include <string.h>
 #include <time.h>
 
+#define BIGNUM 9999999
+
 char* algorithm_type[9] = {"", "Optimal", "FIFO", "LIFO", "LRU", "LFU", "SC", "ESC", "ALL"};
 
 int* input1;
@@ -426,8 +428,8 @@ void LRU() {
 void LFU() {
     HIT_CNT = MISS_CNT = 0;
     initiate_Pageframe();
-    Node *tmp, *maxNode;
-    int max = 0;
+    Node *tmp, *minNode, *newNode;
+    int min;
     for (int i = 0; i < PAGE_STREAM_NUM; i++){
 
         if (find_node(RANDOM_STREAM[i])) { // HIT 구간
@@ -437,34 +439,51 @@ void LFU() {
         }
         if (pageframe->size < PAGEFRAME_NUM) { // append 구간 (프레임 개수보다 들어 온 페이지 개수가 적을 때)
             append_node(RANDOM_STREAM[i]);
+            reference_cnt[RANDOM_STREAM[i]]++;
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
 
-        // tmp = pageframe->head;
-        // while(1){
-        //     if(max < reference_cnt[tmp->page]){
-        //         max = reference_cnt[tmp->page];
-        //         maxNode = tmp;
-        //     }
-        //     if(tmp == pageframe->tail) break;
+        tmp = pageframe->head;
+        min = BIGNUM;
+        while(1){
+            if(min > reference_cnt[tmp->page]){
+                min = reference_cnt[tmp->page];
+                minNode = tmp;
+            }
+            if(tmp == pageframe->tail) break;
 
-        //     tmp = tmp->next;
-        // }
+            tmp = tmp->next;
+        }
+        // minNode : 최소 참조 횟수를 가진 노드 == 교체 대상
 
-        // if(maxNode == pageframe->head){
-        //     maxNode->next = pageframe->head->next;
-        //     free(pageframe->head);
-        //     pageframe->head = maxNode;
-        //     continue;
-        // }
-        // if(maxNode == pageframe->tail){
-        //     pageframe->tail->prev->next = maxNode;
-        //     free(pageframe->tail);
-        //     pageframe->tail = maxNode;
-        //     continue;
-        // }
+        newNode = create_node(RANDOM_STREAM[i]);
+        reference_cnt[RANDOM_STREAM[i]]++;
+        // newNode : minNode와 교체할 새로운 노드
 
+        if(minNode == pageframe->head){
+            newNode->next = pageframe->head->next;
+            pageframe->head->next->prev = newNode;
+            free(pageframe->head);
+            pageframe->head = newNode;
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+        if(minNode == pageframe->tail){
+            pageframe->tail->prev->next = newNode;
+            newNode->prev = pageframe->tail->prev;
+            free(pageframe->tail);
+            pageframe->tail = newNode;
+            print_pageframe(RANDOM_STREAM[i], "MISS");
+            continue;
+        }
+        minNode->prev->next = newNode;
+        newNode->prev = minNode->prev;
+        minNode->next->prev = newNode;
+        newNode->next = minNode->next;
+        free(minNode);
+        MISS_CNT++;
+        print_pageframe(RANDOM_STREAM[i], "MISS");
     }
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
