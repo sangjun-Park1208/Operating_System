@@ -7,13 +7,17 @@
 
 #define BIGNUM 9999999
 #define BUF_SIZE 5
+
+// 파일 입출력을 위한 전처리문
 #define PRINT_BUF_SIZE 1024
+
 
 char print_buf[PRINT_BUF_SIZE];
 char* algorithm_type[9] = {"", "Optimal", "FIFO", "LIFO", "LRU", "LFU", "SC", "ESC", "ALL"};
 char* algorithm_type_filename[9] = {"", "Optimal.txt", "FIFO.txt", "LIFO.txt", "LRU.txt", "LFU.txt", "SC.txt", "ESC.txt", ""};
 
-int* input1;
+/* 입력 전역 변수*/
+int* input1; // 첫 번째 입력의 경우, 최대 3개까지 받을 수 있게 구현
 int input1_cnt;
 int input2;
 int input3;
@@ -25,11 +29,12 @@ int PAGE_STREAM_NUM;
 
 int* RANDOM_STREAM;
 
-int reference_cnt[31]; // For LFU Algorithm
+int reference_cnt[31]; // For LFU Algorithm : 참조 횟수
 
-int fd;
+int fd; // 파일 입출력 File descriptor
 
-typedef struct Node {
+/* 링크드 리스트 구현을 위한 Node, Pageframe 구조체 */
+typedef struct Node { 
     struct Node* next;
     struct Node* prev;
     int page;
@@ -49,10 +54,12 @@ typedef struct Pageframe {
 Pageframe* pageframe;
 
 void start_simulator();
+/* 입력 함수 */
 void get_input1();
 void get_input2();
 void get_input3();
 
+/* 스트림 랜덤 생성 함수 */
 void set_random_stream();
 void set_random_stream_to_file(int);
 
@@ -101,7 +108,7 @@ void start_simulator(){
     get_input2();
     get_input3();
 
-    if(!hasOptimal()) {
+    if(!hasOptimal()) { // Optimal()은 따로 불리지 않아도 항상 호출되어야 함.
         if((fd = open(algorithm_type_filename[1], O_RDWR | O_CREAT | O_TRUNC)) < 0){
             printf("open error in %s\n", algorithm_type_filename[1]);
             exit(1);
@@ -125,7 +132,7 @@ void start_simulator(){
             print_stream();
             print_column();
         }
-        switch (input1[i]){
+        switch (input1[i]){ // 첫 번째 입력에서 받은 다중 값들에 대한 알고리즘 함수 실행
             case 1:
                 Optimal();
                 break;
@@ -213,10 +220,10 @@ void get_input3(){
 
         printf("Input Page stream count (bigger than 500).\n");
         scanf("%d", &PAGE_STREAM_NUM);
-        // if(PAGE_STREAM_NUM < 500){
-        //     printf("Usage: Page stream count must be bigger than 500. Try again.\n");
-        //     continue;
-        // }
+        if(PAGE_STREAM_NUM < 500){
+            printf("Usage: Page stream count must be bigger than 500. Try again.\n");
+            continue;
+        }
 
 
         if(input3 == 1) set_random_stream();
@@ -251,36 +258,32 @@ void set_random_stream_to_file(int fd_) {
     int k=0;
 
     srand((unsigned int)time(NULL));
-    // printf("DEBUG0\n");
     int s;
-    for(int i=0; i<PAGE_STREAM_NUM; i++){
+    for(int i=0; i<PAGE_STREAM_NUM; i++){ // 랜덤으로 스트림 생성
         s = rand()%30 + 1;
         sprintf(RANDOM_STREAM_STR, "%d ", s);
-        // printf("%s", RANDOM_STREAM_STR);
-        if(s<10) write(fd_, RANDOM_STREAM_STR, 2);
+        if(s<10) write(fd_, RANDOM_STREAM_STR, 2); // 1바이트씩 읽기 때문에, 숫자가 두 자리인 경우는 따로 처리
         if(s>=10) write(fd_, RANDOM_STREAM_STR, 3);
         memset(RANDOM_STREAM_STR, '\0', 3);
     }
     printf("\n");
 
     lseek(fd_, 0, SEEK_SET);
-    // printf("DEBUG1\n");
     while(read(fd_, c, 1) > 0){
         if(strcmp(c, " ")) { // 공백이 아니면
-            strcat(buf, c);
+            strcat(buf, c); // 뒤에 붙임
             continue;
         }
 
         // 공백이면
-        RANDOM_STREAM[k] = atoi(buf);
-        // printf("%d ", RANDOM_STREAM[k]);
+        RANDOM_STREAM[k] = atoi(buf); // 앞 숫자가 끝났으므로, 불러와서 저장
         memset(buf, '\0', BUF_SIZE);
         k++;
     }
     printf("\n");
 }
 
-int split(char* string, char* seperator, char* argv[]){
+int split(char* string, char* seperator, char* argv[]){ // seperator를 delimeter로 사용
     int argc = 0;
     char* ptr = NULL;
 
@@ -293,10 +296,10 @@ int split(char* string, char* seperator, char* argv[]){
 }
 
 
-void print_algorithm_type(int type_num) {
+void print_algorithm_type(int type_num) { // 수행할 알고리즘의 명칭 출력
     printf("[%s] Simulator\n", algorithm_type[type_num]);
 }
-void print_column() {
+void print_column() {  // 스트림과 그에 따른 결과 칼럼 출력
     printf("Stream\t\t");
     printf("Result\t\t");
     sprintf(print_buf, "Stream\t\tResult\t\t");
@@ -312,7 +315,7 @@ void print_column() {
     printf("\n");
     write(fd, "\n", 2);
 }
-void print_pageframe(int stream, char* result) {
+void print_pageframe(int stream, char* result) { // 각 알고리즘 함수 내에서 호출, page stream 별로 한 번씩 출력됨
     printf("%d\t\t%s\t\t", stream, result);
     sprintf(print_buf, "%d\t\t%s\t\t", stream, result);
     write(fd, print_buf, PRINT_BUF_SIZE);
@@ -369,7 +372,7 @@ void print_Allpageframe() {
 }
 
 
-Node* create_node(int page) {
+Node* create_node(int page) { // 노드 생성
     Node* newNode = (Node*)malloc(sizeof(Node));
     newNode->page = page;
     newNode->next = NULL;
@@ -377,7 +380,7 @@ Node* create_node(int page) {
     newNode->ref_bit = 1;
     return newNode;
 }
-void append_node(int page) {
+void append_node(int page) { // 노드 추가 (tail)
     MISS_CNT++;
     if(pageframe->head == NULL){ // 없으면 초기화
         pageframe->head = pageframe->tail = create_node(page);
@@ -391,7 +394,7 @@ void append_node(int page) {
     pageframe->size++;
     return;
 }
-void append_node_circular(int page) {
+void append_node_circular(int page) { // 노드 추가(SC 구현 시 사용 : 원형 연결 리스트)
     MISS_CNT++;
     if(pageframe->head == NULL){ // 없으면 초기화
         pageframe->head = pageframe->tail = pageframe->cur = create_node(page);
@@ -408,27 +411,22 @@ void append_node_circular(int page) {
     pageframe->size++;
     return;
 }
-Node* find_node(int page) {
-
-    // print_Allpageframe();
+Node* find_node(int page) { // head 부터 tail까지 순회하며 원하는 페이지가 있는지(hit) 여부 체크
     if(pageframe->head == NULL) {
         return NULL;
     }
     pageframe->tmp = pageframe->head;
     while(1){
-        // printf("tmp->page : %d, page : %d\n", pageframe->tmp->page, page);
         if(pageframe->tmp->page == page) return pageframe->tmp;
         if(pageframe->tmp == pageframe->tail) {break;}
         pageframe->tmp = pageframe->tmp->next;
     }
     return NULL; // Not Found
 }
-void initiate_Pageframe() {
+void initiate_Pageframe() { // 반복적으로 알고리즘을 실행하기 위해, page frame 초기화
     pageframe = (Pageframe*)malloc(sizeof(Pageframe));
     pageframe->head = pageframe->tail = NULL;
 }
-
-
 
 void Optimal() {
     HIT_CNT = MISS_CNT = 0;
@@ -453,17 +451,17 @@ void Optimal() {
         while(out == 0){
             // 교체 대상 찾기
             for(j = i; j < PAGE_STREAM_NUM; j++){
-                if(tmp->page == RANDOM_STREAM[j]){
-                    if(max < j){ // 갱신
-                        max = j;
-                        replaceNode = tmp;
+                if(tmp->page == RANDOM_STREAM[j]){ // 현재 page frame에 있는 page가 뒤에 또 등장하는 경우
+                    if(max < j){ // 등장한 page가 현재까지 갱신된 max값보다 더 큰 경우
+                        max = j; // 갱신하고
+                        replaceNode = tmp; // 대체 노드를 현재 커서가 가리키는 노드로 설정함
                     }
-                    break;
+                    break; // break를 통해 아래의 경우(마지막에 도달했고 && 갱신한 경우)를 따로 처리함.
                 }
-                if(j == PAGE_STREAM_NUM-1){
+                if(j == PAGE_STREAM_NUM-1){ // 마지막에 도달했지만 해당 page가 없는 경우 : 가장 우선순위가 높음
                     replaceNode = tmp;
                     out = 1;
-                    break;
+                    break; // 이번 loop에서는 더 이상 처리할 필요가 없기 때문에 탈출(out 조건)
                 }
             }
 
@@ -476,7 +474,7 @@ void Optimal() {
 
     // replaceNode <-> newNode
         newNode = create_node(RANDOM_STREAM[i]);
-        if(replaceNode == pageframe->head){
+        if(replaceNode == pageframe->head){ // head일 때 예외 처리
             newNode->next = pageframe->head->next;
             pageframe->head->next->prev = newNode;
             free(pageframe->head);
@@ -485,7 +483,7 @@ void Optimal() {
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
-        if(replaceNode == pageframe->tail){
+        if(replaceNode == pageframe->tail){ // tail일 때 예외 처리
             newNode->prev = pageframe->tail->prev;
             pageframe->tail->prev->next = newNode;
             free(pageframe->tail);
@@ -534,7 +532,6 @@ void FIFO() {
         append_node(RANDOM_STREAM[i]);
         print_pageframe(RANDOM_STREAM[i], "MISS");
 
-        // print_Allpageframe();
     }
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
@@ -565,7 +562,6 @@ void LIFO() {
         pageframe->tail = newNode;
         MISS_CNT++;
         print_pageframe(RANDOM_STREAM[i], "MISS");
-        // print_Allpageframe();
     }
 
     HIT_CNT = PAGE_STREAM_NUM - MISS_CNT;
@@ -578,7 +574,7 @@ void LRU() {
     for (int i = 0; i < PAGE_STREAM_NUM; i++){
 
         if (hitNode = find_node(RANDOM_STREAM[i])){ // HIT 구간
-            /* change_sequence() */
+            /* change_sequence */
             if(pageframe->size == 1) {
                 print_pageframe(RANDOM_STREAM[i], "HIT");
                 continue;
@@ -588,7 +584,6 @@ void LRU() {
                 if(hitNode == pageframe->head) {
                     tmp = pageframe->head;
                     pageframe->head = pageframe->head->next;
-                    // tmp->next = pageframe->head; 
                     tmp->next = NULL;
                     pageframe->head->prev = NULL;
                     pageframe->tail->next = tmp;
@@ -652,7 +647,7 @@ void LFU() {
 
         tmp = pageframe->head;
         min = BIGNUM;
-        while(1){
+        while(1){ // 현재 page frame에서 가장 빈도수가 낮은 page 찾는 과정
             if(min > reference_cnt[tmp->page]){
                 min = reference_cnt[tmp->page];
                 minNode = tmp;
@@ -667,7 +662,7 @@ void LFU() {
         reference_cnt[RANDOM_STREAM[i]]++;
         // newNode : minNode와 교체할 새로운 노드
 
-        if(minNode == pageframe->head){
+        if(minNode == pageframe->head){ // 교체 노드가 head인 경우
             newNode->next = pageframe->head->next;
             pageframe->head->next->prev = newNode;
             free(pageframe->head);
@@ -676,7 +671,7 @@ void LFU() {
             print_pageframe(RANDOM_STREAM[i], "MISS");
             continue;
         }
-        if(minNode == pageframe->tail){
+        if(minNode == pageframe->tail){ // 교체 노드가 tail인 경우
             pageframe->tail->prev->next = newNode;
             newNode->prev = pageframe->tail->prev;
             free(pageframe->tail);
@@ -717,13 +712,13 @@ void SC() {
         tmp = pageframe->cur;
         newNode = create_node(RANDOM_STREAM[i]);
         while(1){
-            if(tmp->ref_bit == 1) {
+            if(tmp->ref_bit == 1) { // 참조 비트가 1인 경우 : 0으로 바꾸고 다음으로 커서 이동
                 tmp->ref_bit = 0;
                 tmp = tmp->next;
                 continue;
             }
-            if(tmp->ref_bit == 0) {
-                if(tmp == pageframe->head){
+            if(tmp->ref_bit == 0) { // 참조 비트가 0인 경우 : 교체 대상
+                if(tmp == pageframe->head){ // 교체 대상이 head인 경우
                     newNode->next = pageframe->head->next;
                     pageframe->head->next->prev = newNode;
                     newNode->prev = pageframe->tail;
@@ -735,7 +730,7 @@ void SC() {
                     pageframe->cur = newNode->next;
                     break;
                 }
-                if(tmp == pageframe->tail){
+                if(tmp == pageframe->tail){ // 교체 대상이 tail인 경우
                     newNode->next = pageframe->head;
                     pageframe->head->prev = newNode;
                     newNode->prev = pageframe->tail->prev;
