@@ -155,6 +155,50 @@ filewrite(struct file *f, char *addr, int n)
   panic("filewrite");
 }
 
+
+// 파일 타입과 관계없이 공통으로 출력
+//   파일의 inode번호, 타입, 크기, direct 블록에 저장된 내용
+
+// 파일 타입에 따라 다르게 출력
+//    CS타입인 경우 : (번호, 길이) 추가로 출력
+
+// file struct -> ip(inode pointer) -> inode struct 필요
 void fileprintinfo(struct file* f, char* fname){
-  cprintf("f->ip->inum: %d, fname: %s\n", f->ip->inum, fname);
+
+  cprintf("FILE NAME: %s\n", fname);
+  cprintf("INODE NUM: %d\n", f->ip->inum);
+
+  switch (f->ip->type){
+    case 1:
+      cprintf("FILE TYPE: DIR\n");
+      break;
+    case 2:
+      cprintf("FILE TYPE: FILE\n");
+      break;
+    case 3:
+      cprintf("FILE TYPE: DEV\n");
+      break;
+    case 4:
+      cprintf("FILE TYPE: CS\n");
+      break;
+  }
+
+  cprintf("FILE SIZE: %d Bytes\n", f->ip->size);
+  cprintf("DIRECT BLOCK INFO: \n");
+  
+  // FILE 인 경우
+  if(f->ip->type == 2){
+    for(int i=0; i<NDIRECT; i++) 
+      cprintf("[%d] %d\n", i, f->ip->addrs[i]);
+  }
+
+  // CS 인 경우
+  if(f->ip->type == 4){
+    for(int i=0; i<NDIRECT; i++){
+      // [idx] block (num: num, length: length)  <-- 출력
+      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], 0, 0); // num, length 값 수정
+    }
+  }
+  cprintf("\n");
+  
 }
