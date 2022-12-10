@@ -155,3 +155,6 @@ filewrite(struct file *f, char *addr, int n)
   panic("filewrite");
 }
 
+void fileprintinfo(struct file* f, char* fname){
+  cprintf("f->ip->inum: %d, fname: %s\n", f->ip->inum, fname);
+}

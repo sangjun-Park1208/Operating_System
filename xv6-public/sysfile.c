@@ -442,3 +442,20 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+int sys_printinfo(void){
+  int fd;
+  char* fname;
+  struct file* fp;
+
+  if(argint(0, &fd) < 0 || argstr(1, &fname) < 0){
+    cprintf("arg input error in printinfo\n");
+    return -1;
+  }
+
+  fp = myproc()->ofile[fd];
+  if(fp == 0) return -1;
+
+  fileprintinfo(fp, fname); // (1) 인자로 file 구조체 필요
+  return 1;
+}
