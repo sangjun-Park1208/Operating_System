@@ -10,6 +10,8 @@
 #include "sleeplock.h"
 #include "file.h"
 
+#define BIT_255 255
+
 struct devsw devsw[NDEV];
 struct {
   struct spinlock lock;
@@ -196,7 +198,7 @@ void fileprintinfo(struct file* f, char* fname){
   if(f->ip->type == 4){
     for(int i=0; i<NDIRECT; i++){
       // [idx] block (num: num, length: length)  <-- 출력
-      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], 0, 0); // num, length 값 수정
+      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], f->ip->addrs[i]>>8, f->ip->addrs[i]&BIT_255); // num, length 값 수정
     }
   }
   cprintf("\n");

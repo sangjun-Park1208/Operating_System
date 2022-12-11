@@ -253,6 +253,8 @@ create(char *path, short type, short major, short minor)
     ilock(ip);
     if(type == T_FILE && ip->type == T_FILE)
       return ip;
+    if(type == T_CS && ip->type == T_CS)
+      return ip;
     iunlockput(ip);
     return 0;
   }
@@ -295,7 +297,14 @@ sys_open(void)
 
   begin_op();
 
-  if(omode & O_CREATE){
+  if((omode & O_CREATE) && (omode & O_CS)){
+    ip = create(path, T_CS, 0, 0);
+    if(ip == 0){
+      end_op();
+      return -1;
+    }
+  }
+  else if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
@@ -446,15 +455,15 @@ sys_pipe(void)
 int sys_printinfo(void){
   int fd;
   char* fname;
-  struct file* fp;
+  struct file* fp; // (2) file struct pointer 선언
 
   if(argint(0, &fd) < 0 || argstr(1, &fname) < 0){
     cprintf("arg input error in printinfo\n");
     return -1;
   }
 
-  fp = myproc()->ofile[fd];
-  if(fp == 0) return -1;
+  fp = myproc()->ofile[fd]; // (3) 현재 process의 open file
+  if(fp == 0) return -1; // (3-1) 에러처리
 
   fileprintinfo(fp, fname); // (1) 인자로 file 구조체 필요
   return 1;

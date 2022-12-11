@@ -25,11 +25,10 @@ int main()
 		printf(2, "ERROR: open failed in cs file\n");
 		exit();
 	}
-
 	for (i = 0; i < BUFMAX; i++)
 		buf[i] = 'a';
-
-	for (i = 0; i < 2; i++) {
+	
+	for (i = 0; i < 2; i++) {	
 		if ((size = write(fd, buf, BUFMAX)) != BUFMAX) {
 			printf(2, "ERROR: write failed in cs file\n");
 			exit();
@@ -40,7 +39,6 @@ int main()
 			write_to_norm("test_norm");	
 		*/
 	}
-
 	printinfo(fd, fname);
 	
 	close(fd);
