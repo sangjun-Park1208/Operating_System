@@ -10,8 +10,6 @@
 #include "sleeplock.h"
 #include "file.h"
 
-#define BIT_255 255
-
 struct devsw devsw[NDEV];
 struct {
   struct spinlock lock;
@@ -190,15 +188,18 @@ void fileprintinfo(struct file* f, char* fname){
   
   // FILE 인 경우
   if(f->ip->type == 2){
-    for(int i=0; i<NDIRECT; i++) 
+    for(int i=0; i<NDIRECT; i++){
+      if(f->ip->addrs[i] == 0) continue;
       cprintf("[%d] %d\n", i, f->ip->addrs[i]);
+    }
   }
 
   // CS 인 경우
   if(f->ip->type == 4){
     for(int i=0; i<NDIRECT; i++){
       // [idx] block (num: num, length: length)  <-- 출력
-      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], f->ip->addrs[i]>>8, f->ip->addrs[i]&BIT_255); // num, length 값 수정
+      if(f->ip->addrs[i] == 0) continue;
+      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], f->ip->addrs[i]>>8, f->ip->addrs[i] & 255); // num, length 값 수정
     }
   }
   cprintf("\n");

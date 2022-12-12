@@ -21,7 +21,6 @@
 #include "buf.h"
 #include "file.h"
 
-#define BIT_255 255
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
 // there should be one superblock per disk device, but we run with
@@ -82,7 +81,7 @@ balloc(uint dev)
     brelse(bp);
   }
   // 여기까지 왔다면 모든 블록이 사용 중인 상태. 빈 블록 없음.
-  panic("balloc: out of blocks");
+  panic("balloc: 빈 블록 없음\n");
 }
 
 // Free a disk block.
@@ -286,7 +285,7 @@ iget(uint dev, uint inum)
 
   release(&icache.lock);
 
-  return ip;
+  return ip;  
 }
 
 // Increment reference count for ip.
@@ -390,14 +389,15 @@ iunlockput(struct inode *ip)
 // readi()와 writei() 함수에서 호출됨
 // n번째 블록에 있는 inode의 pointer를 리턴 (blocknum에 해당하는 ip) 
 static uint
-bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자로 받음
-{ // -> 디스크 상의 블록 넘버로 리턴해주는 함수 (파일 상에서 쪼갠걸 디스크로 매핑하는)
-  uint addr, *a;
-  struct buf *bp;  
+bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자로 받음 -> 디스크 상의 블록 넘버로 리턴해주는 함수
+{ //  bn = offset / BSIZE (블록 하나의 크기인 512를 기준, 몇 개의 블록을 차지하는지)
+  uint addr = 0;
+  uint *a;
+  struct buf *bp;
 
   // 기존 파일 시스템
   if(ip->type != T_CS) {
-    if (bn < NDIRECT){
+    if (bn < NDIRECT) {
       if ((addr = ip->addrs[bn]) == 0)          // 빈 공간 찾아서
         ip->addrs[bn] = addr = balloc(ip->dev); // 새로운 블록 할당 
       return addr;                              // 그리고 리턴
@@ -425,20 +425,61 @@ bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자�
 
   // CS 파일 시스템
   if(ip->type == T_CS) {
-    if((addr = ip->addrs[bn]) == 0) // 비어 있다면 새로운 블록 할당
-      ip->addrs[bn] = addr = balloc(ip->dev);
+    int cumulative_block_sum = 0; // inode에 있는 연속 블록 수 누적합
+    uint NUM_3byte, LEN_1byte; // 상위 3바이트(번호), 하위 1바이트 (길이)
+    // ex) (600, 5) -> (1200, 10) -> (16450, 22) : cumulative_block_num = 37
 
-    // 상위 24bit (3byte) : 할당되는 데이터 블록의 시작 번호   
-    addr = addr<<8;
+    // 전체 direct inode block 개수만큼 돌면서, 하위 8bit masking(길이 추출)
+    for(int i=0; i<NDIRECT; i++) {
+      if(ip->addrs[i] == 0) continue;
+      LEN_1byte = (ip->addrs[i] & 255); // 하위 8bit -> 비트 마스킹
+      cumulative_block_sum += LEN_1byte;
+    }
 
-    // 하위 8bit (1byte) : 연속으로 할당되는 데이터 블록의 개수
-    cprintf("addr: %d\n", addr);
-    int filesize = ip->size / BSIZE;
-    addr += filesize;
-    cprintf("addr+filesize: %d\n", addr);
-    return addr;
+    // 찾고자 하는 bn이 inode table에 등록된 블록 개수보다 큰 경우 : 새 블록 할당
+    //cprintf("bn: %d, c_block_sum: %d\n", bn, cumulative_block_sum);
+    if(cumulative_block_sum <= bn){
+      addr = balloc(ip->dev); // addr : 32bit 기존 파일시스템 블록넘버
+      if(addr == 0) return 0;
+  
+      for(int i=0; i< NDIRECT; i++){
+        if(ip->addrs[i] == 0) continue;
+        if(ip->addrs[i] == 1) ip->addrs[i] = 0;
+
+        NUM_3byte = ip->addrs[i] >> 8;
+        LEN_1byte = ip->addrs[i] & 255;
+
+        if(LEN_1byte == 255 && ip->addrs[i+1] == 0) {
+          ip->addrs[i+1]=1;
+          return addr;
+        }
+        if(NUM_3byte + LEN_1byte == addr) {
+          ip->addrs[i]++;
+          return addr;
+        }
+      }
+      for(int i=0; i<NDIRECT; i++){
+        if(ip->addrs[i] == 0){
+          ip->addrs[i] = (addr<<8) + 1;
+          return addr;
+        }
+      }
+      return 0;
+    } 
+    else {
+      // 새 블록을 할당하지 않는 경우
+      for(int i=0; i<NDIRECT; i++){
+        if(ip->addrs[i] == 0) continue;
+        cumulative_block_sum -= (ip->addrs[i] & 255);
+        if(cumulative_block_sum <= 0) {
+          return (ip->addrs[i]>>8) + bn;
+        }
+        bn = cumulative_block_sum;
+      }
+    }
+    return 0;
   }
-  return addr;
+  panic("!!!!\n");
 }
 
 // Truncate inode (discard contents).
@@ -452,24 +493,38 @@ itrunc(struct inode *ip)
   int i, j;
   struct buf *bp;
   uint *a;
+  if(ip->type != T_CS){
+    for(i = 0; i < NDIRECT; i++){
+      if(ip->addrs[i]){
+        bfree(ip->dev, ip->addrs[i]);
+        ip->addrs[i] = 0;
+      }
+    }
 
-  for(i = 0; i < NDIRECT; i++){
-    if(ip->addrs[i]){
-      bfree(ip->dev, ip->addrs[i]);
-      ip->addrs[i] = 0;
+    if(ip->addrs[NDIRECT]){
+      bp = bread(ip->dev, ip->addrs[NDIRECT]);
+      a = (uint*)bp->data;
+      for(j = 0; j < NINDIRECT; j++){
+        if(a[j])
+          bfree(ip->dev, a[j]);
+      }
+      brelse(bp);
+      bfree(ip->dev, ip->addrs[NDIRECT]);
+      ip->addrs[NDIRECT] = 0;
     }
   }
+  
+  if(ip->type == T_CS){
+    int LEN_1byte;
+    for(i=0; i<NDIRECT; i++){
+      if(ip->addrs[i] == 0) continue;
 
-  if(ip->addrs[NDIRECT]){
-    bp = bread(ip->dev, ip->addrs[NDIRECT]);
-    a = (uint*)bp->data;
-    for(j = 0; j < NINDIRECT; j++){
-      if(a[j])
-        bfree(ip->dev, a[j]);
+      LEN_1byte =(ip->addrs[i] & 255);
+      for(j=0; j<LEN_1byte; j++)
+        bfree(ip->dev, (ip->addrs[i]>>8) + j);
+      
+      ip->addrs[i] = 0;
     }
-    brelse(bp);
-    bfree(ip->dev, ip->addrs[NDIRECT]);
-    ip->addrs[NDIRECT] = 0;
   }
 
   ip->size = 0;
@@ -531,6 +586,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
       return -1;
+
     return devsw[ip->major].write(ip, src, n);
   }
 
@@ -538,18 +594,19 @@ writei(struct inode *ip, char *src, uint off, uint n)
     return -1;
 
   // CS 파일시스템인 경우, 초과되기 전까지는 데이터 씀 (<-> 기존 파일시스템은 범위 넘어가면 안 쓰고 에러처리)
-  if(ip->type != T_CS && off + n > MAXFILE*BSIZE) // CS인 경우 종료되지 않도록
+  // if(ip->type != T_CS && off + n > MAXFILE*BSIZE) // CS인 경우 종료되지 않도록
+  //   return -1;
+  if(off + n > MAXFILE*BSIZE && ip->type!=T_CS)
     return -1;
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
     blockNum = bmap(ip, off/BSIZE);
-    cprintf("blockNum: %d\n", blockNum);
 
-    if(blockNum == 0) return -1;
+    if(blockNum == 0)
+      return -1;
     
     bp = bread(ip->dev, blockNum);
     m = min(n - tot, BSIZE - off%BSIZE);
-    cprintf("m: %d\n", m);
     memmove(bp->data + off%BSIZE, src, m);
     log_write(bp);
     brelse(bp);
@@ -559,8 +616,6 @@ writei(struct inode *ip, char *src, uint off, uint n)
     ip->size = off;
     iupdate(ip);
   }
-  cprintf("writei : ip->size : %d\n", ip->size);
-
   return n;
 }
 

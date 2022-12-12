@@ -28,16 +28,15 @@ int main()
 	for (i = 0; i < BUFMAX; i++)
 		buf[i] = 'a';
 	
-	for (i = 0; i < 2; i++) {	
+	for (i = 0; i < 130; i++) {	
 		if ((size = write(fd, buf, BUFMAX)) != BUFMAX) {
 			printf(2, "ERROR: write failed in cs file\n");
 			exit();
 		}
 
-		/*	
-		if (i == 50)
-			write_to_norm("test_norm");	
-		*/
+		// if (i == 50)
+		// 	write_to_norm("test_norm");	
+		
 	}
 	printinfo(fd, fname);
 	
