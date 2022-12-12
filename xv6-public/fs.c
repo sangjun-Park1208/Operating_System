@@ -57,8 +57,7 @@ bzero(int dev, int bno)
 
 // Allocate a zeroed disk block.
 // 블록 새롭게 할당
-static uint
-balloc(uint dev)
+static uint balloc(uint dev)
 {
   int b, bi, m;
   struct buf *bp;
@@ -86,8 +85,7 @@ balloc(uint dev)
 
 // Free a disk block.
 // 디스크 블록 해제
-static void
-bfree(int dev, uint b)
+static void bfree(int dev, uint b)
 {
   struct buf *bp;
   int bi, m;
@@ -200,8 +198,7 @@ static struct inode* iget(uint dev, uint inum);
 // Mark it as allocated by  giving it type type.
 // Returns an unlocked but allocated and referenced inode.
 // inode를 새롭게 할당 <- create 시스템콜(open 시스템콜에서 호출됨) 에서 호출
-struct inode*
-ialloc(uint dev, short type)
+struct inode* ialloc(uint dev, short type)
 {
   int inum;
   struct buf *bp;
@@ -388,8 +385,7 @@ iunlockput(struct inode *ip)
 // If there is no such block, bmap allocates one.
 // readi()와 writei() 함수에서 호출됨
 // n번째 블록에 있는 inode의 pointer를 리턴 (blocknum에 해당하는 ip) 
-static uint
-bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자로 받음 -> 디스크 상의 블록 넘버로 리턴해주는 함수
+static uint bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자로 받음 -> 디스크 상의 블록 넘버로 리턴해주는 함수
 { //  bn = offset / BSIZE (블록 하나의 크기인 512를 기준, 몇 개의 블록을 차지하는지)
   uint addr = 0;
   uint *a;
@@ -444,16 +440,13 @@ bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자�
   
       for(int i=0; i< NDIRECT; i++){
         if(ip->addrs[i] == 0) continue;
-        // if(ip->addrs[i] == 1) {ip->addrs[i] = 0;} // 마킹 되었다면 여기가 마지막
 
         NUM_3byte = ip->addrs[i] >> 8;
         LEN_1byte = ip->addrs[i] & 255;
 
-        if(LEN_1byte == 255 && ip->addrs[i+1] == 0) { // 다음이 없는 경우 ip->addrs[i+1] = 1로 마킹
-          // ip->addrs[i+1]=1;
-          // return addr;
+        if(LEN_1byte == 255 && ip->addrs[i+1] == 0)
           break;
-        }
+        
         if(NUM_3byte + LEN_1byte == addr) {
           ip->addrs[i]++;
           return addr;
@@ -487,8 +480,7 @@ bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자�
 // to it (no directory entries referring to it)
 // and has no in-memory reference to it (is
 // not an open file or current directory).
-static void
-itrunc(struct inode *ip)
+static void itrunc(struct inode *ip)
 {
   int i, j;
   struct buf *bp;
@@ -546,8 +538,7 @@ stati(struct inode *ip, struct stat *st)
 //PAGEBREAK!
 // Read data from inode.
 // Caller must hold ip->lock.
-int
-readi(struct inode *ip, char *dst, uint off, uint n)
+int readi(struct inode *ip, char *dst, uint off, uint n)
 {
   // cprintf("readi 진입: ip->inum : %d\n", ip->inum);
   uint tot, m;
@@ -576,8 +567,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
 // PAGEBREAK!
 // Write data to inode.
 // Caller must hold ip->lock.
-int
-writei(struct inode *ip, char *src, uint off, uint n)
+int writei(struct inode *ip, char *src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
@@ -594,7 +584,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
     return -1;
 
   // CS 파일시스템인 경우, 초과되기 전까지는 데이터 씀 (<-> 기존 파일시스템은 범위 넘어가면 안 쓰고 에러처리)
-  if(off + n > MAXFILE*BSIZE && ip->type!=T_CS) // CS인 경우 종료되지 않도록
+  if(ip->type!=T_CS && off + n > MAXFILE*BSIZE) // CS인 경우 종료되지 않도록
     return -1;
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){

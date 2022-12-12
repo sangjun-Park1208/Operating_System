@@ -197,9 +197,8 @@ void fileprintinfo(struct file* f, char* fname){
   // CS 인 경우
   if(f->ip->type == 4){
     for(int i=0; i<NDIRECT; i++){
-      // [idx] block (num: num, length: length)  <-- 출력
       if(f->ip->addrs[i] == 0) continue;
-      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], f->ip->addrs[i]>>8, f->ip->addrs[i] & 255); // num, length 값 수정
+      cprintf("[%d] %d (num: %d, length: %d)\n", i, f->ip->addrs[i], f->ip->addrs[i]>>8, f->ip->addrs[i] & 255);
     }
   }
   cprintf("\n");
