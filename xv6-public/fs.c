@@ -444,14 +444,15 @@ bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자�
   
       for(int i=0; i< NDIRECT; i++){
         if(ip->addrs[i] == 0) continue;
-        if(ip->addrs[i] == 1) ip->addrs[i] = 0;
+        // if(ip->addrs[i] == 1) {ip->addrs[i] = 0;} // 마킹 되었다면 여기가 마지막
 
         NUM_3byte = ip->addrs[i] >> 8;
         LEN_1byte = ip->addrs[i] & 255;
 
-        if(LEN_1byte == 255 && ip->addrs[i+1] == 0) {
-          ip->addrs[i+1]=1;
-          return addr;
+        if(LEN_1byte == 255 && ip->addrs[i+1] == 0) { // 다음이 없는 경우 ip->addrs[i+1] = 1로 마킹
+          // ip->addrs[i+1]=1;
+          // return addr;
+          break;
         }
         if(NUM_3byte + LEN_1byte == addr) {
           ip->addrs[i]++;
@@ -460,14 +461,13 @@ bmap(struct inode *ip, uint bn) // 현재 파일 상의 block number를 인자�
       }
       for(int i=0; i<NDIRECT; i++){
         if(ip->addrs[i] == 0){
-          ip->addrs[i] = (addr<<8) + 1;
+          ip->addrs[i] = (addr<<8) + 1; // 다음을 가리키도록 함
           return addr;
         }
       }
       return 0;
     } 
-    else {
-      // 새 블록을 할당하지 않는 경우
+    else { // 새 블록을 할당하지 않는 경우
       for(int i=0; i<NDIRECT; i++){
         if(ip->addrs[i] == 0) continue;
         cumulative_block_sum -= (ip->addrs[i] & 255);
@@ -594,9 +594,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
     return -1;
 
   // CS 파일시스템인 경우, 초과되기 전까지는 데이터 씀 (<-> 기존 파일시스템은 범위 넘어가면 안 쓰고 에러처리)
-  // if(ip->type != T_CS && off + n > MAXFILE*BSIZE) // CS인 경우 종료되지 않도록
-  //   return -1;
-  if(off + n > MAXFILE*BSIZE && ip->type!=T_CS)
+  if(off + n > MAXFILE*BSIZE && ip->type!=T_CS) // CS인 경우 종료되지 않도록
     return -1;
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
